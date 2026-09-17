@@ -266,15 +266,23 @@
         const lng = parseFloat(String(stand.lng).replace(',', '.'));
         if (isNaN(lat) || isNaN(lng)) return;
 
-        const kategorienListe = (stand.kategorien || '')
-          .split(';').map(k => k.trim()).filter(k => k.length > 0);
-
-        const hatKeineKategorie = kategorienListe.length === 0 || 
-                          kategorienListe.some(k => k.toLowerCase().includes('keine angabe'));
-
-        const match = hatKeineKategorie || kategorienListe.some(k => 
+        // 1. Kategorien aufsplitten und trimmen
+        const rawKat = (stand.kategorien || '').trim();
+        const kategorienListe = rawKat ? rawKat.split(';').map(k => k.trim()).filter(Boolean) : [];
+        
+        // 2. Prüfen, ob der Stand unter "ohne Angabe / Nachzügler" fällt
+        const rawLower = rawKat.toLowerCase();
+        const istOhneKategorie = kategorienListe.length === 0 || 
+                                 rawLower.includes('angab') ||   // deckt "keine angabe", "keine angaben", "ohne angabe" ab
+                                 rawLower.includes('keine');
+        
+        // 3. Prüfen, ob eine der regulären Filter-Checkboxen passt
+        const passtZuFiltern = kategorienListe.some(k => 
           aktiveFilter.includes(k.toLowerCase())
         );
+
+// Stand anzeigen, wenn er zu einem aktiven Filter passt ODER gar keine reguläre Kategorie hat
+const match = istOhneKategorie || passtZuFiltern;
 
         if (match) {
           const adresse = stand.adresse || 'Trödelstand';
