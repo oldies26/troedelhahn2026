@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trödelmarkt Karte mit Filtern</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: sans-serif;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    /* Schwebendes Filter-Menü oben rechts */
+    .filter-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      font-size: 14px;
+      max-width: 220px;
+    }
+    .filter-panel h4 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+    }
+    .filter-panel label {
+      display: block;
+      margin-bottom: 5px;
+      cursor: pointer;
+    }
+
+    /* Container für die Tag-Pillen */
+    .tag-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    /* Stil der einzelnen Tags */
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 12px;
+      line-height: 1.3;
+    }
+
+    /* Hauptkategorien (blau) */
+    .badge-cat {
+      background-color: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #bbdefb;
+    }
+
+    /* Sonstiges-Tags (grau/neutral) */
+    .badge-misc {
+      background-color: #f1f3f4;
+      color: #444;
+      border: 1px solid #dadce0;
+    }
+
+    .btn-primary-list {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px 14px;
+      background-color: #0d6efd;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(13, 110, 253, 0.25);
+      transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+    .btn-primary-list:hover {
+      background-color: #0b5ed7;
+    }
+    .btn-primary-list:active {
+      transform: scale(0.98);
+    }
+
+    /* Modal Overlay */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(2px);
+      z-index: 2000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .modal-box {
+      background: #ffffff;
+      width: 100%;
+      max-width: 600px;
+      max-height: 85vh;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h2 {
+      margin: 0;
+      font-size: 18px;
+      color: #212529;
+    }
+    .close-btn {
+      background: transparent;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #888;
+      line-height: 1;
+    }
+    .close-btn:hover {
+      color: #000;
+    }
+
+    .modal-body {
+      padding: 14px 18px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Einzelne Stand-Karten in der Liste */
+    .stand-card {
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .stand-card:hover {
+      background: #edf2f7;
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+    .stand-card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+    .stand-card-time {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Filter-Bedienfeld mit deinen exakten Kategorien -->
+  <div class="filter-panel">
+    <h4>Kategorien filtern</h4>
+    <label><input type="checkbox" class="cat-filter" value="Kleidung & Accessoires" checked> Kleidung & Accessoires</label>
+    <label><input type="checkbox" class="cat-filter" value="Bücher, Filme & Musik" checked> Bücher, Filme & Musik</label>
+    <label><input type="checkbox" class="cat-filter" value="Spielzeug" checked> Spielzeug</label>
+    <label><input type="checkbox" class="cat-filter" value="Babyartikel" checked> Babyartikel</label>
+    <label><input type="checkbox" class="cat-filter" value="Kinderkleidung" checked> Kinderkleidung</label>
+    <label><input type="checkbox" class="cat-filter" value="Haushaltswaren & Dekoration" checked> Haushaltswaren & Dekoration</label>
+    <label><input type="checkbox" class="cat-filter" value="(Kleine) Möbelstücke" checked> (Kleine) Möbelstücke</label>
+    <label><input type="checkbox" class="cat-filter" value="Elektronik & Gadgets" checked> Elektronik & Gadgets</label>
+    <label><input type="checkbox" class="cat-filter" value="Antiquitäten & Sammlerstücke" checked> Antiquitäten & Sammlerstücke</label>
+    <button id="btn-show-list" class="btn-primary-list">📋 Liste aller Stände anzeigen</button>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="stand-list-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Alle Stände (A–Z)</h2>
+        <button id="btn-close-list" class="close-btn">&times;</button>
+      </div>
+      <div id="modal-stand-list" class="modal-body">
+        <!-- Einträge werden dynamisch per JavaScript eingefügt -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS & Papa Parse (für CSV-Verarbeitung) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script>
+    // 1. Karte initialisieren
+    const map = L.map('map', { scrollWheelZoom: false }).setView([51.2291, 7.13359], 16);
+    const markerMap = new Map();
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap Mitwirkende'
+    }).addTo(map);
+
+    // Layer-Gruppe für Marker
+    const markerLayer = L.layerGroup().addTo(map);
+
+    // Speicher für alle geladenen Stände
+    let alleStaende = [];
+
+    // 2. Ersetze diesen Link durch deinen eigenen "Im Web veröffentlichen"-CSV-Link!
+    const sheetCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQpz-NBZ1XwgSRzkCEwdNcyrzqiz9dat1EQ9Cd77aWbxbe24ZNkpY8pQ9XS6SDm5-egw_D_eywf14SM/pub?gid=0&single=true&output=csv';
+
+    // 3. CSV per Papa Parse laden
+    Papa.parse(sheetCsvUrl, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        alleStaende = results.data.filter(row => row.lat && row.lng);
+        markerAktualisieren();
+      },
+      error: function(err) {
+        console.error("Fehler beim Laden der Tabelle:", err);
+      }
+    });
+
+    // 4. Marker passend zu den ausgewählten Checkboxen setzen
+    function markerAktualisieren() {
+      markerLayer.clearLayers();
+      markerMap.clear();
+
+      const aktiveFilter = Array.from(document.querySelectorAll('.cat-filter:checked'))
+                                .map(cb => cb.value.toLowerCase().trim());
+
+      alleStaende.forEach((stand, index) => {
+        const lat = parseFloat(String(stand.lat).replace(',', '.'));
+        const lng = parseFloat(String(stand.lng).replace(',', '.'));
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const kategorienListe = (stand.kategorien || '')
+          .split(';').map(k => k.trim()).filter(k => k.length > 0);
+
+        const match = kategorienListe.some(k => aktiveFilter.includes(k.toLowerCase()));
+
+        if (match) {
+          const adresse = stand.adresse || 'Trödelstand';
+          const uhrzeit = stand.zeit ? `🕒 <b>Uhrzeit:</b> ${stand.zeit}` : '';
+          const beschreibung = stand.beschreibung ? `<p style="margin: 6px 0; color: #444; font-size: 13px;">${stand.beschreibung}</p>` : '';
+
+          const catBadges = kategorienListe
+            .map(k => `<span class="badge badge-cat">${k}</span>`).join('');
+
+          const sonstigesListe = (stand.sonstiges || '')
+            .split(';').map(s => s.trim()).filter(s => s.length > 0);
+          const miscBadges = sonstigesListe
+            .map(s => `<span class="badge badge-misc">${s}</span>`).join('');
+
+          const popupInhalt = `
+            <div style="min-width: 180px; max-width: 240px; line-height: 1.4;">
+              <h3 style="margin: 0 0 4px 0; font-size: 15px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">📍 ${adresse}</h3>
+              ${uhrzeit ? `<div style="font-size: 12px; color: #555; margin-bottom: 4px;">${uhrzeit}</div>` : ''}
+              ${beschreibung}
+              ${catBadges ? `<div style="margin-top: 8px;"><strong style="font-size: 11px; color: #666; text-transform: uppercase;">Angebot:</strong><div class="tag-container">${catBadges}</div></div>` : ''}
+              ${miscBadges ? `<div style="margin-top: 6px;"><strong style="font-size: 11px; color: #666; text-transform: uppercase;">Außerdem:</strong><div class="tag-container">${miscBadges}</div></div>` : ''}
+            </div>
+          `;
+
+          const marker = L.marker([lat, lng]).bindPopup(popupInhalt).addTo(markerLayer);
+          markerMap.set(index, marker);
+        }
+      });
+    }
+
+    // --- Listen-Modal Logik ---
+    const modal = document.getElementById('stand-list-modal');
+    const standListContainer = document.getElementById('modal-stand-list');
+
+    document.getElementById('btn-show-list').addEventListener('click', () => {
+      // 1. Stände alphabetisch nach Adresse sortieren (deutsche Umlaute korrekt berücksichtigen)
+      const sortierteStaende = [...alleStaende]
+        .map((stand, originalIndex) => ({ ...stand, originalIndex }))
+        .sort((a, b) => {
+          const addrA = (a.adresse || '').trim();
+          const addrB = (b.adresse || '').trim();
+          
+          return addrA.localeCompare(addrB, 'de', { 
+            numeric: true,      // Behandelt "6" < "19" mathematisch korrekt
+            sensitivity: 'base' // Behandelt "6a" und "6A" gleich, ordnet "6a" aber direkt nach "6" ein
+          });
+        });
+        
+      // 2. HTML für Liste generieren
+      standListContainer.innerHTML = sortierteStaende.map(stand => {
+        const catBadges = (stand.kategorien || '')
+          .split(';').map(k => k.trim()).filter(Boolean)
+          .map(k => `<span class="badge badge-cat">${k}</span>`).join('');
+
+        return `
+          <div class="stand-card" data-index="${stand.originalIndex}" data-lat="${stand.lat}" data-lng="${stand.lng}">
+            <div class="stand-card-title">📍 ${stand.adresse || 'Unbenannter Stand'}</div>
+            ${stand.zeit ? `<div class="stand-card-time">🕒 ${stand.zeit}</div>` : ''}
+            <div class="tag-container">${catBadges}</div>
+          </div>
+        `;
+      }).join('');
+
+      modal.style.display = 'flex';
+    });
+
+    // Modal schließen
+    document.getElementById('btn-close-list').addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+
+    // Klick auf eine Stand-Karte: Modal zu, Karte zentrieren & PopUp auf
+    standListContainer.addEventListener('click', (e) => {
+      const card = e.target.closest('.stand-card');
+      if (!card) return;
+
+      const idx = parseInt(card.getAttribute('data-index'), 10);
+      const lat = parseFloat(card.getAttribute('data-lat').replace(',', '.'));
+      const lng = parseFloat(card.getAttribute('data-lng').replace(',', '.'));
+
+      modal.style.display = 'none';
+
+      map.flyTo([lat, lng], 17, { duration: 1 });
+      
+      const marker = markerMap.get(idx);
+      if (marker) {
+        marker.openPopup();
+      }
+    });
+
+    // 5. Event-Listener auf alle Filter-Checkboxen
+    document.querySelectorAll('.cat-filter').forEach(checkbox => {
+      checkbox.addEventListener('change', markerAktualisieren);
+    });
+  </script>
+</body>
+</html>
