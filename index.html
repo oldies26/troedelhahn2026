@@ -269,7 +269,12 @@
         const kategorienListe = (stand.kategorien || '')
           .split(';').map(k => k.trim()).filter(k => k.length > 0);
 
-        const match = kategorienListe.some(k => aktiveFilter.includes(k.toLowerCase()));
+        const hatKeineKategorie = kategorienListe.length === 0 || 
+                          kategorienListe.some(k => k.toLowerCase().includes('keine angabe'));
+
+        const match = hatKeineKategorie || kategorienListe.some(k => 
+          aktiveFilter.includes(k.toLowerCase())
+        );
 
         if (match) {
           const adresse = stand.adresse || 'Trödelstand';
